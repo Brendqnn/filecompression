@@ -55,6 +55,10 @@ int main(int argc, char** argv) {
     codec_context = avcodec_alloc_context3(NULL);
     avcodec_parameters_to_context(codec_context, input_context->streams[video_stream_index]->codecpar);
 
+    // setting bitrate to 1 Mbps
+    av_dict_set(&options, "b:v", "1000000", 0);
+    av_dict_set(&options, "crf", "10", 0);
+
     // open codec
     if (avcodec_open2(codec_context, codec, nullptr) < 0)
     {
@@ -62,10 +66,6 @@ int main(int argc, char** argv) {
         avformat_close_input(&input_context);
         return 1;
     }
-
-    // setting bitrate
-    av_dict_set(&options, "b:v", "1000000", 0);
-    avcodec_open2(codec_context, codec, &options);
     
     // output context
     if (avformat_alloc_output_context2(&output_context, nullptr, nullptr, "output.mp4") < 0)
@@ -118,15 +118,12 @@ int main(int argc, char** argv) {
     // compress video frame
     AVPacket packet;
     av_init_packet(&packet);
-    while (av_read_frame(input_context, &packet) >= 0)
-    {
-        if(packet.stream_index == video_stream_index)
-        {
+    while (av_read_frame(input_context, &packet) >= 0) {
+        if (packet.stream_index == video_stream_index) {
             AVFrame *frame = av_frame_alloc();
             int ret;
             ret = avcodec_send_frame(codec_context, frame);
-            if (ret < 0)
-            {
+            if (ret < 0) {
                 std::cout << "Error sending packet" << std::endl;
                 av_frame_free(&frame);
                 av_packet_unref(&packet);
@@ -142,17 +139,14 @@ int main(int argc, char** argv) {
             ret = avcodec_receive_packet(codec_context, &packet_compress);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 std::cout << "Error no packet received" << std::endl;
-            }  else {
+            } else {
                 packet_compress.stream_index = stream->index;
-                if (av_interleaved_write_frame(output_context, &packet_compress) < 0) 
-                {
+                if (av_interleaved_write_frame(output_context, &packet_compress) < 0) {
                     std::cout << "Error writing packet" << std::endl;
                 }
-
                 av_packet_unref(&packet_compress);
             }
         }
-        
     }    
 
     return 0;
