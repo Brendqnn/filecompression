@@ -70,7 +70,77 @@ int main(int argc, char** argv) {
         avformat_close_input(&input_context);
         return 1;
     }
+    // add stream to output context 
+    stream = avformat_new_stream(output_context, codec);
+    if (!stream)
+    {
+        std::cout << "Error creating stream" << std::endl;
+        avformat_free_context(output_context);
+        avcodec_close(codec_context);
+        avformat_close_input(&input_context);
+        return 1;
+    }
 
+    // copy codec to output file
+    if (avcodec_parameters_from_context(stream->codecpar, codec_context)< 0)
+    {
+        std::cout << "Error copying codec context" << std::endl;
+        avformat_free_context(output_context);
+        avcodec_close(codec_context);
+        avformat_close_input(&input_context);
+        return 1;
+    }
+    
+    if (avio_open(&output_context->pb, "output.mp4", AVIO_FLAG_WRITE) < 0)
+    {
+        std::cout << "Error opening output file" << std::endl;
+        avformat_free_context(output_context);
+        avcodec_close(codec_context);
+        avformat_close_input(&input_context);
+        return 1;
+    }
+
+    if (avformat_write_header(output_context, nullptr) < 0)
+    {
+        std::cout << "Erorr writing header" << std::endl;
+        avio_closep(&output_context->pb);
+        avformat_free_context(output_context);
+        avcodec_close(codec_context);
+        avformat_close_input(&input_context);
+        return 1;
+    }
+
+    // compress video frame
+
+    AVPacket packet;
+    av_init_packet(&packet);
+    while (av_read_frame(input_context, &packet) < 0)
+    {
+        if(packet.stream_index == video_stream_index)
+        {
+            AVFrame *frame = av_frame_alloc();
+            int ret;
+            ret = avcodec_send_packet(codec_context, &packet);
+            if (ret < 0)
+            {
+                std::cout << "Error sending packet" << std::endl;
+                av_frame_free(&frame);
+                av_packet_unref(&packet);
+                av_write_trailer(output_context);
+                avio_closep(&output_context->pb);
+                avformat_free_context(output_context);
+                avcodec_close(codec_context);
+                avformat_close_input(&input_context);
+                return 1;
+            }
+            ret = avcodec_receive_frame(codec_context, frame);
+            if (ret < 0)
+            {
+                std::cout << "Error receiving frame" << std::endl;
+            }
+        }
+        
+    }    
 
 
     return 0;
