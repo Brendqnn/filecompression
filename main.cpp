@@ -17,12 +17,12 @@ int main(int argc, char** argv) {
 
     AVFormatContext *input_context = nullptr;
     AVFormatContext *output_context = nullptr;
-    AVCodec *codec = nullptr;
+    const AVCodec *codec = nullptr;
     AVStream *stream = nullptr;
     AVCodecContext *codec_context = nullptr;
     AVDictionary *options = NULL;
 
-    if (avformat_open_input(&input_context, "input.mp4", nullptr, nullptr) != 0)
+    if (avformat_open_input(&input_context, "res/wallbounce.mp4", nullptr, nullptr) != 0)
     {
         std::cout << "Error opening input file" << std::endl;
         return 1;
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     av_dict_set(&options, "crf", "10", 0);
 
     // open codec
-    if (avcodec_open2(codec_context, codec, nullptr) < 0)
+    if (avcodec_open2(codec_context, codec, &options) < 0)
     {
         std::cout << "Erorr Opening codec" << std::endl;
         avformat_close_input(&input_context);
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     }
     
     // output context
-    if (avformat_alloc_output_context2(&output_context, nullptr, nullptr, "output.mp4") < 0)
+    if (avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/wallbounce.mp4") < 0)
     {
         std::cout << "Error creating output context" << std::endl;
         avcodec_close(codec_context);
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    if (avio_open(&output_context->pb, "output.mp4", AVIO_FLAG_WRITE) < 0)
+    if (avio_open(&output_context->pb, "C:/Users/b/Videos/Apex Legends/", AVIO_FLAG_WRITE) < 0)
     {
         std::cout << "Error opening output file" << std::endl;
         avformat_free_context(output_context);
@@ -116,38 +116,49 @@ int main(int argc, char** argv) {
     }
 
     // compress video frame
+    AVFrame *frame = av_frame_alloc();
     AVPacket packet;
-    av_init_packet(&packet);
     while (av_read_frame(input_context, &packet) >= 0) {
         if (packet.stream_index == video_stream_index) {
-            AVFrame *frame = av_frame_alloc();
-            int ret;
-            ret = avcodec_send_frame(codec_context, frame);
+            int ret = avcodec_send_packet(codec_context, &packet);
             if (ret < 0) {
                 std::cout << "Error sending packet" << std::endl;
-                av_frame_free(&frame);
-                av_packet_unref(&packet);
-                av_write_trailer(output_context);
-                avio_closep(&output_context->pb);
-                avformat_free_context(output_context);
-                avcodec_close(codec_context);
-                avformat_close_input(&input_context);
-                return 1;
+                break;
             }
             AVPacket packet_compress;
-            av_init_packet(&packet_compress);
-            ret = avcodec_receive_packet(codec_context, &packet_compress);
+            ret = avcodec_receive_frame(codec_context, frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 std::cout << "Error no packet received" << std::endl;
-            } else {
+                break;
+            }
+            // encode
+            ret = avcodec_send_frame(codec_context, frame);
+            if (ret < 0) {
+                std::cout << "Error sending video frame" << std::endl;
+                break;
+            }
+            while (ret >= 0) {
+                ret = avcodec_receive_packet(codec_context, &packet_compress);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    break;
+                }
                 packet_compress.stream_index = stream->index;
                 if (av_interleaved_write_frame(output_context, &packet_compress) < 0) {
                     std::cout << "Error writing packet" << std::endl;
+                    break;
                 }
-                av_packet_unref(&packet_compress);
+
             }
+            av_packet_unref(&packet_compress);
         }
+
     }    
+    av_write_trailer(output_context);
+    avio_closep(&output_context->pb);
+    avformat_free_context(output_context);
+    avcodec_close(codec_context);
+    avformat_close_input(&input_context);
+    av_frame_free(&frame);
 
     return 0;
 }
