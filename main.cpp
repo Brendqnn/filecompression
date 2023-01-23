@@ -6,21 +6,22 @@
 
 extern "C" {
     #include <libavcodec/avcodec.h>
+    #include <libavcodec/codec.h>
     #include <libavformat/avformat.h>
     #include <libavutil/avutil.h>
     #include <libswscale/swscale.h>
 }
 
 
-
 int main(int argc, char** argv) {
 
     AVFormatContext *input_context = nullptr;
     AVFormatContext *output_context = nullptr;
-    const AVCodec *codec = nullptr;
+    const AVCodec *codec = avcodec_find_encoder_by_name("h264");
     AVStream *stream = nullptr;
     AVCodecContext *codec_context = nullptr;
     AVDictionary *options = NULL;
+
 
     if (avformat_open_input(&input_context, "res/wallbounce.mp4", nullptr, nullptr) != 0)
     {
@@ -59,6 +60,8 @@ int main(int argc, char** argv) {
     av_dict_set(&options, "b:v", "1000000", 0);
     av_dict_set(&options, "crf", "10", 0);
 
+    std::cout << "hello" << std::endl;
+
     // open codec
     if (avcodec_open2(codec_context, codec, &options) < 0)
     {
@@ -68,7 +71,7 @@ int main(int argc, char** argv) {
     }
     
     // output context
-    if (avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/wallbounce.mp4") < 0)
+    if (avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/compressed-wallbounce.mp4") < 0)
     {
         std::cout << "Error creating output context" << std::endl;
         avcodec_close(codec_context);
@@ -96,7 +99,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    if (avio_open(&output_context->pb, "C:/Users/b/Videos/Apex Legends/", AVIO_FLAG_WRITE) < 0)
+    if (avio_open(&output_context->pb, "res/compressed-wallbounce.mp4", AVIO_FLAG_WRITE) < 0)
     {
         std::cout << "Error opening output file" << std::endl;
         avformat_free_context(output_context);
@@ -115,9 +118,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // compress video frame
+    // // compress video frame
     AVFrame *frame = av_frame_alloc();
     AVPacket packet;
+    AVPacket packet_compress;
     while (av_read_frame(input_context, &packet) >= 0) {
         if (packet.stream_index == video_stream_index) {
             int ret = avcodec_send_packet(codec_context, &packet);
@@ -125,7 +129,6 @@ int main(int argc, char** argv) {
                 std::cout << "Error sending packet" << std::endl;
                 break;
             }
-            AVPacket packet_compress;
             ret = avcodec_receive_frame(codec_context, frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 std::cout << "Error no packet received" << std::endl;
@@ -147,12 +150,11 @@ int main(int argc, char** argv) {
                     std::cout << "Error writing packet" << std::endl;
                     break;
                 }
-
+                std::cout << "Packet written to output file" << std::endl;
             }
-            av_packet_unref(&packet_compress);
         }
-
     }    
+    av_packet_unref(&packet_compress);
     av_write_trailer(output_context);
     avio_closep(&output_context->pb);
     avformat_free_context(output_context);
@@ -161,4 +163,5 @@ int main(int argc, char** argv) {
     av_frame_free(&frame);
 
     return 0;
+    std::cout << "Compression successful!" << std::endl;
 }
