@@ -2,7 +2,7 @@ CFLAGS = -I C:\ffmpeg\include
 LDFLAGS = -L C:\ffmpeg\lib -lavcodec -lavformat -lavutil
 
 all:
-	g++ $(CFLAGS) -o main.exe main.cpp $(LDFLAGS) && start main
+	g++ $(CFLAGS) -o main.exe main.cpp $(LDFLAGS)
 
 clean:
 	del *.exe
