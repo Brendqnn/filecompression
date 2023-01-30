@@ -69,16 +69,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const AVCodec *output_codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+    const AVCodec *output_codec = avcodec_find_encoder(AV_CODEC_ID_H265);
     AVCodecContext *output_codec_context = avcodec_alloc_context3(output_codec);
 
-
-    output_codec_context->bit_rate = 50000;
+    output_codec_context->bit_rate = 8000000;
     output_codec_context->width = decoder_context->width;
     output_codec_context->height = decoder_context->height;
     output_codec_context->pix_fmt = output_codec->pix_fmts[0];
     output_codec_context->time_base = (AVRational){1, fps};
-
 
     if (avcodec_open2(output_codec_context, output_codec, nullptr) < 0) {
         std::cout << "Error: could not open codec for output file" << std::endl;
@@ -121,13 +119,6 @@ int main(int argc, char** argv) {
     packet.size = 0;
 
     AVFrame *frame = av_frame_alloc();
-    // Allocate an AVFrame to store the resized video frame
-    // AVFrame *resized_frame = av_frame_alloc();
-
-    // SwsContext *scaler_context = sws_getContext(decoder_context->width, decoder_context->height, decoder_context->pix_fmt,output_codec_context->width, output_codec_context->height, output_codec_context->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
-                                
-    // Set up the scaler context
-
     
     frame->width = output_codec_context->width;
     frame->height = output_codec_context->height;
