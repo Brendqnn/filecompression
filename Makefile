@@ -1,8 +1,8 @@
-CFLAGS = -I C:\ffmpeg\include
-LDFLAGS = -L C:\ffmpeg\lib -lavcodec -lavformat -lavutil -lswresample
+CFLAGS = -I C:\sdk\ffmpeg\include -I include 
+LDFLAGS = -L C:\sdk\ffmpeg\lib -lavcodec -lavformat -lavutil -lswresample
 
 all:
-	g++ $(CFLAGS) -o main.exe main.cpp $(LDFLAGS)
+	g++ $(CFLAGS) -o main.exe src/*.cpp main.cpp $(LDFLAGS)
 
 clean:
 	del *.exe
