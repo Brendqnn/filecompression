@@ -36,6 +36,11 @@ void SLcompressor::find_media_stream() {
     }
 }
 
+void SLcompressor::set_input_stream() {
+    input_video_stream = input_context->streams[video_stream_index];
+    input_audio_stream = input_context->streams[audio_stream_index];
+}
+
 void SLcompressor::open_decoder_context() {
     video_decoder = avcodec_find_decoder(input_context->streams[video_stream_index]->codecpar->codec_id);
     video_decoder_context = avcodec_alloc_context3(video_decoder);
@@ -49,39 +54,42 @@ void SLcompressor::open_decoder_context() {
     }
 }
 
-void SLcompressor::set_stream() {
-    input_audio_stream = input_context->streams[audio_stream_index];
-    input_video_stream = input_context->streams[video_stream_index];
-    input_video_framerate = input_video_stream->r_frame_rate;
-}
-
-void SLcompressor::alloc_output_context() {
-    avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/compressed-indigo.mp4");
-    output_video_stream = avformat_new_stream(output_context, video_encoder);
-    output_video_stream->time_base = input_video_stream->time_base;
+void SLcompressor::set_encoder_properties() {
+    video_encoder_context->bit_rate = 3000000;
+    video_encoder_context->width = video_decoder_context->width;
+    video_encoder_context->height = video_decoder_context->height;
+    video_encoder_context->pix_fmt = video_encoder->pix_fmts[0];
+    video_encoder_context->framerate = input_video_framerate;
+    video_encoder_context->time_base = input_video_stream->time_base;
 }
 
 void SLcompressor::open_encoder_context() {
-    const AVCodec *video_encoder = avcodec_find_encoder(AV_CODEC_ID_H265);
-    AVCodecContext *video_encoder_context = avcodec_alloc_context3(video_encoder);
+    video_encoder = avcodec_find_encoder(AV_CODEC_ID_H265);
+    video_encoder_context = avcodec_alloc_context3(video_encoder);
+    set_encoder_properties();
     if (avcodec_open2(video_encoder_context, video_encoder, nullptr) < 0) {
         std::cout << "Error: could not open codec for output file" << std::endl;
         avcodec_free_context(&video_decoder_context);
         avcodec_free_context(&video_encoder_context);
         avformat_close_input(&input_context);
     }
+    avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/compressed-indigo.mp4");
+    output_video_stream = avformat_new_stream(output_context, video_encoder);
+    output_video_stream->time_base = input_video_stream->time_base;
+    if (!output_video_stream) {
+        std::cout << "Error: could not allocate output video stream" << std::endl;
+        avcodec_free_context(&video_decoder_context);
+        avcodec_free_context(&video_encoder_context);
+        avformat_close_input(&input_context);
+        avformat_free_context(output_context);
+    }
     if (avcodec_parameters_from_context(output_video_stream->codecpar, video_encoder_context) < 0) {
         std::cout << "Error copying codec parameters" << std::endl;
+        avcodec_free_context(&video_decoder_context);
+        avcodec_free_context(&video_encoder_context);
+        avformat_close_input(&input_context);
+        avformat_free_context(output_context);
     }
-}
-
-void SLcompressor::set_encoder_properties() {
-    video_encoder_context->bit_rate = 3000000;
-    video_encoder_context->width = video_decoder_context->width;
-    video_encoder_context->height = video_decoder_context->height;
-    video_encoder_context->pix_fmt = video_encoder->pix_fmts[0];
-    video_encoder_context->time_base = input_video_stream->time_base;
-    video_encoder_context->framerate = input_video_framerate;
 }
 
 void SLcompressor::copy_audio_parameters() {
@@ -115,6 +123,7 @@ void SLcompressor::write_file_header() {
 
 void SLcompressor::read_frames() {
     frame = av_frame_alloc();
+    av_frame_get_buffer(frame, 0);
     while (av_read_frame(input_context, &packet) >= 0) {
         if (packet.stream_index == video_stream_index) {
             if (avcodec_send_packet(video_decoder_context, &packet) < 0) {
@@ -127,12 +136,12 @@ void SLcompressor::read_frames() {
                     break;
                 }
                 if (avcodec_send_frame(video_encoder_context, frame) < 0 ) {
-                    std::cerr << "Error sending frame" << std::endl;
+                    std::cout << "Error sending frame" << std::endl;
                     break;
                 }
                 while (avcodec_receive_packet(video_encoder_context, &packet) >= 0) {
                     if (av_interleaved_write_frame(output_context, &packet) < 0) {
-                        std::cerr << "Error writing to frame to output" << std::endl;
+                        std::cout << "Error writing to frame to output" << std::endl;
                         break;
                     }
                 }
@@ -153,9 +162,3 @@ void SLcompressor::close_resources() {
     avcodec_free_context(&video_decoder_context);
     avformat_close_input(&input_context);
 }
-
-
-
-
-
-
