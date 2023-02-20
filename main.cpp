@@ -18,7 +18,6 @@ int main(int argc, char** argv) {
     s.open_decoder_context();
     s.open_encoder_context();
     s.copy_audio_parameters();
-    s.open_output_media();
     s.write_file_header();
     s.read_frames();
     s.close_resources();

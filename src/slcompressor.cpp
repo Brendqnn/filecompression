@@ -13,10 +13,8 @@ void SLcompressor::find_media_stream() {
         std::cout << "Error finding stream info" << std::endl;
         avformat_close_input(&input_context);
     }
-    
     video_stream_index = -1;
     audio_stream_index = -1;
-    
     for (unsigned int i = 0; i < input_context->nb_streams; i++) {
         if (input_context->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             video_stream_index = i;
@@ -24,12 +22,10 @@ void SLcompressor::find_media_stream() {
             audio_stream_index = i;
         }
     }
-
     if (video_stream_index == -1) {
         std::cout << "Error: no video stream found in input file" << std::endl;
         avformat_close_input(&input_context);
     }
-
     if (audio_stream_index == -1) {
         std::cout << "Error: no audio stream found in input file" << std::endl;
         avformat_close_input(&input_context);
@@ -55,16 +51,16 @@ void SLcompressor::open_decoder_context() {
 }
 
 void SLcompressor::set_encoder_properties() {
-    video_encoder_context->bit_rate = 3000000;
+    video_encoder_context->bit_rate = 6000000;
     video_encoder_context->width = video_decoder_context->width;
     video_encoder_context->height = video_decoder_context->height;
     video_encoder_context->pix_fmt = video_encoder->pix_fmts[0];
-    video_encoder_context->framerate = input_video_framerate;
     video_encoder_context->time_base = input_video_stream->time_base;
+    video_encoder_context->framerate = input_video_framerate;
 }
 
 void SLcompressor::open_encoder_context() {
-    video_encoder = avcodec_find_encoder(AV_CODEC_ID_H265);
+    video_encoder = avcodec_find_encoder(input_video_stream->codecpar->codec_id);
     video_encoder_context = avcodec_alloc_context3(video_encoder);
     set_encoder_properties();
     if (avcodec_open2(video_encoder_context, video_encoder, nullptr) < 0) {
@@ -74,7 +70,7 @@ void SLcompressor::open_encoder_context() {
         avformat_close_input(&input_context);
     }
     avformat_alloc_output_context2(&output_context, nullptr, nullptr, "res/compressed-indigo.mp4");
-    output_video_stream = avformat_new_stream(output_context, video_encoder);
+    output_video_stream = avformat_new_stream(output_context, NULL);
     output_video_stream->time_base = input_video_stream->time_base;
     if (!output_video_stream) {
         std::cout << "Error: could not allocate output video stream" << std::endl;
@@ -100,7 +96,7 @@ void SLcompressor::copy_audio_parameters() {
     avcodec_parameters_copy(output_audio_stream->codecpar, input_audio_stream->codecpar);
 }
 
-void SLcompressor::open_output_media() {
+void SLcompressor::write_file_header() {
     if (!(output_context->flags & AVFMT_NOFILE)) {
         if (avio_open(&output_context->pb, "res/compressed-indigo.mp4", AVIO_FLAG_WRITE) < 0) {
             std::cout << "Error: could not open output file" << std::endl;
@@ -109,9 +105,6 @@ void SLcompressor::open_output_media() {
             avformat_close_input(&input_context);
         }
     }
-}
-
-void SLcompressor::write_file_header() {
     if (avformat_write_header(output_context, nullptr) < 0) {
         std::cout << "Error: could not write header to output file" << std::endl;
         avcodec_free_context(&video_decoder_context);

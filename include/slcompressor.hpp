@@ -44,11 +44,9 @@ public:
     void find_media_stream();
     void open_decoder_context();
     void set_input_stream();
-    // void alloc_output_context();
     void open_encoder_context();
     void set_encoder_properties();
     void copy_audio_parameters();
-    void open_output_media();
     void write_file_header();
     void read_frames();
     void close_resources();
